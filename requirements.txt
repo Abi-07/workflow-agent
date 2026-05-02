@@ -1,0 +1,22 @@
+# LLM (local)
+ollama>=0.3.0
+
+# Data validation
+pydantic>=2.7.0
+
+# Google Calendar
+google-api-python-client>=2.125.0
+google-auth>=2.29.0
+google-auth-oauthlib>=1.2.0
+
+# Env
+python-dotenv>=1.0.1
+
+# Logging
+loguru>=0.7.2
+
+# Time parsing
+python-dateutil>=2.9.0
+
+# Testing
+pytest>=8.2.0
