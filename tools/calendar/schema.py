@@ -11,11 +11,13 @@ class SearchEventInput(BaseModel):
 class CreateEventInput(BaseModel):
     title: str
     datetime: str
+    duration: Optional[int] = 60  # minutes, default 1 hour
 
 
 class UpdateEventInput(BaseModel):
     event_id: str
     new_datetime: str
+    original_datetime: Optional[str] = None  # original event's datetime for preserving date
 
 
 class CheckAvailabilityInput(BaseModel):
