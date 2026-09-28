@@ -27,6 +27,28 @@ def normalize_entities(entities: dict) -> dict:
     if "event_date" in normalized and "date" not in normalized:
         normalized["date"] = normalized["event_date"]
 
+    # Extract duration from title or other fields
+    if "duration" not in normalized:
+        duration_match = None
+        text_to_check = normalized.get("title", "") + " " + normalized.get("raw_input", "")
+        
+        # Look for patterns like "30 minute", "2 hour", "1.5 hr", etc.
+        import re
+        duration_patterns = [
+            r'(\d+(?:\.\d+)?)\s*(?:hour|hr)s?\b',  # hours
+            r'(\d+(?:\.\d+)?)\s*(?:minute|min)s?\b',  # minutes
+        ]
+        
+        for pattern in duration_patterns:
+            match = re.search(pattern, text_to_check, re.I)
+            if match:
+                value = float(match.group(1))
+                if 'hour' in pattern or 'hr' in pattern:
+                    normalized["duration"] = int(value * 60)  # convert hours to minutes
+                else:
+                    normalized["duration"] = int(value)  # minutes
+                break
+
     if "datetime" not in normalized:
         if normalized.get("date") and normalized.get("time"):
             normalized["datetime"] = f"{normalized['date']} {normalized['time']}"
@@ -52,6 +74,7 @@ def fallback_plan(intent: dict) -> list[dict]:
     if intent_name == "create_event":
         title = entities.get("title") or clean_title(raw_input)
         datetime_value = entities.get("datetime") or f"{entities.get('date', 'today')} {entities.get('time', '4pm')}"
+        duration = entities.get("duration", 60)  # default 1 hour
         return [
             {
                 "id": 1,
@@ -59,6 +82,7 @@ def fallback_plan(intent: dict) -> list[dict]:
                 "input": {
                     "title": title,
                     "datetime": datetime_value,
+                    "duration": duration,
                 },
             }
         ]
@@ -78,6 +102,7 @@ def fallback_plan(intent: dict) -> list[dict]:
                 "input": {
                     "event_id": "$step_1.event_id",
                     "new_datetime": new_datetime,
+                    "original_datetime": "$step_1.start",
                 },
             },
         ]
@@ -104,20 +129,6 @@ def fallback_plan(intent: dict) -> list[dict]:
 
     return []
 
-
-def create_plan(intent: dict):
-    plan = fallback_plan(intent)
-    if plan:
-        return plan
-
-    template = load_prompt("prompts/planner_prompt.txt")
-    prompt = template.replace("__INTENT_JSON__", json.dumps(intent))
-
-    raw = call_llm(prompt)
-    parsed = safe_parse_json(raw)
-
-    plan = parsed.get("steps", []) if isinstance(parsed, dict) else []
-    if not isinstance(plan, list) or not all(validate_step(step) for step in plan):
-        plan = fallback_plan(intent)
-
-    return plan
+def create_plan(intent: dict, state):
+    # For now, always use fallback planning to avoid LLM timeouts
+    return fallback_plan(intent)

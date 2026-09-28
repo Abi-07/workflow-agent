@@ -50,6 +50,28 @@ def is_finished(state):
         state.current_step >= len(state.plan)
     )
 
+
+def fallback_create_for_missing_event(state):
+    intent = state.intent or {}
+    entities = intent.get("entities", {}) or {}
+    title = entities.get("target_event") or entities.get("title") or "event"
+    new_datetime = entities.get("datetime") or f"{entities.get('date', 'today')} {entities.get('time', '4pm')}"
+    duration = entities.get("duration", 60)
+
+    state.plan = [{
+        "id": 1,
+        "tool": "calendar.create_event",
+        "input": {
+            "title": title,
+            "datetime": new_datetime,
+            "duration": duration,
+        },
+    }]
+    state.current_step = 0
+    state.status = "running"
+    return state
+
+
 def run_agent(user_input: str, state: AgentState = None):
     if state is None:
         state = AgentState(user_input)
@@ -77,9 +99,13 @@ def run_agent(user_input: str, state: AgentState = None):
             else:
                 return state, "Please answer yes or no."
 
-        if not state.plan:
+        # Parse new intent if no plan exists or if previous action completed
+        if not state.plan or state.status == "completed":
+            state.status = "running"
+            state.current_step = 0
+            state.tool_results = []
             state.intent = safe_intent_parse(user_input, state)
-            state.plan = create_plan(state.intent)
+            state.plan = create_plan(state.intent, state)
 
         while not is_finished(state):
             if state.current_step >= len(state.plan):
@@ -97,6 +123,16 @@ def run_agent(user_input: str, state: AgentState = None):
 
             result = safe_execute(step, state)
             state.tool_results.append(result)
+
+            if (
+                step["tool"] == "calendar.search_event"
+                and isinstance(result.get("result"), dict)
+                and result["result"].get("message") == "No events found"
+                and state.intent
+                and state.intent.get("intent") == "update_event"
+            ):
+                state = fallback_create_for_missing_event(state)
+                continue
 
             if result.get("error"):
                 state = replan(state, result)

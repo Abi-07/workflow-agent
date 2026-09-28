@@ -12,7 +12,8 @@ Available tools:
 2. calendar.create_event
    input: {
      "title": string,
-     "datetime": string
+     "datetime": string,
+     "duration": number (minutes, default 60)
    }
 
 3. calendar.update_event
@@ -54,6 +55,11 @@ Input Intent:
 
 Input Intent:
 __INTENT_JSON__
+
+---
+
+User Memory:
+__MEMORY__
 
 ---
 

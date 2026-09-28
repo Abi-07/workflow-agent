@@ -8,38 +8,33 @@ from tools.calendar.schema import (
     AvailabilityOutput,
 )
 from utils.time import parse_time
+from datetime import timedelta
 
 
 # 🔍 SEARCH EVENT
 def search_event(params):
-    try:
-        data = SearchEventInput(**params)
+    data = SearchEventInput(**params)
 
-        service = get_calendar_service()
+    service = get_calendar_service()
 
-        events_result = service.events().list(
-            calendarId="primary",
-            q=data.query,
-            timeMin=data.start_time,
-            timeMax=data.end_time,
-            singleEvents=True,
-            orderBy="startTime",
-        ).execute()
+    events_result = service.events().list(
+        calendarId="primary",
+        q=data.query,
+        singleEvents=True,
+        orderBy="startTime",
+    ).execute()
 
-        events = events_result.get("items", [])
+    events = events_result.get("items", [])
 
-        if events:
-            return EventOutput(
-                event_id=events[0]["id"],
-                title=events[0]["summary"],
-                start_time=events[0]["start"]["dateTime"],
-                end_time=events[0]["end"]["dateTime"],
-            ).dict()
-        else:
-            return {"message": "No events found"}
-    except Exception as e:
-        # Fallback to dummy data
-        return {"event_id": "123", "time": "3pm", "fallback": True}
+    if events:
+        return EventOutput(
+            event_id=events[0]["id"],
+            title=events[0]["summary"],
+            start=events[0]["start"]["dateTime"],
+            end=events[0]["end"]["dateTime"],
+        ).dict()
+    else:
+        return {"message": "No events found"}
 
 
 # ➕ CREATE EVENT
@@ -49,7 +44,7 @@ def create_event(params):
     service = get_calendar_service()
 
     start_time = parse_time(data.datetime)
-    end_time = start_time  # MVP: same time (no duration yet)
+    end_time = start_time + timedelta(minutes=data.duration)
 
     event_body = {
         "summary": data.title,
@@ -65,17 +60,37 @@ def create_event(params):
     return EventOutput(
         event_id=event["id"],
         title=data.title,
-        start=start_time.isoformat()
+        start=start_time.isoformat(),
+        end=end_time.isoformat()
     ).model_dump()
 
 
 # ✏️ UPDATE EVENT
 def update_event(params):
+    import re
     data = UpdateEventInput(**params)
 
     service = get_calendar_service()
 
-    new_time = parse_time(data.new_datetime)
+    # If the new datetime is only a time (without a relative date or explicit date),
+    # keep the original event date and replace only the time portion.
+    has_date_context = re.search(
+        r'\b(day after tomorrow|tomorrow|today|yesterday|\d{1,2}[-/]\d{1,2}|january|february|march|april|may|june|july|august|september|october|november|december)\b',
+        data.new_datetime,
+        re.I,
+    )
+
+    if data.original_datetime and not has_date_context:
+        original_dt = parse_time(data.original_datetime)
+        new_time_dt = parse_time(data.new_datetime)
+        new_time = original_dt.replace(
+            hour=new_time_dt.hour,
+            minute=new_time_dt.minute,
+            second=0,
+            microsecond=0,
+        )
+    else:
+        new_time = parse_time(data.new_datetime)
 
     event = service.events().get(
         calendarId="primary",
