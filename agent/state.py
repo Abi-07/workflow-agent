@@ -1,22 +1,24 @@
-from typing import Any, Dict, List, Optional
+from memory.short_term import ShortTermMemory
+from memory.long_term import LongTermMemory
 
 
 class AgentState:
     def __init__(self, user_input: str):
         self.user_input = user_input
 
-        self.intent: Optional[Dict] = None
-        self.plan: List[Dict] = []
+        self.intent = None
+        self.plan = []
 
-        self.current_step: int = 0
-        self.tool_results: List[Dict] = []
+        self.current_step = 0
+        self.tool_results = []
 
-        self.memory: Dict[str, Any] = {}
+        self.short_memory = ShortTermMemory()
+        self.long_memory = LongTermMemory()
 
-        self.status: str = "initialized"
+        self.status = "initialized"
 
-        # new fields
-        self.retry_count: int = 0
-        self.max_retries: int = 2
-        self.awaiting_confirmation: bool = False
-        self.pending_action: Optional[Dict] = None
+        self.retry_count = 0
+        self.max_retries = 2
+
+        self.awaiting_confirmation = False
+        self.pending_action = None

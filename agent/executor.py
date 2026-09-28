@@ -10,7 +10,17 @@ def execute_step(step: dict, state):
     try:
         params = resolve_references(step["input"], state)
         result = tool_fn(params)
+
+        # ✅ STORE IN MEMORY
+        if tool_name == "calendar.create_event":
+            title = params.get("title")
+            event_id = result.get("event_id")
+
+            if title and event_id:
+                state.long_memory.store_event(title, event_id)
+
         return {"result": result}
+
     except Exception as e:
         return {"error": str(e)}
     
